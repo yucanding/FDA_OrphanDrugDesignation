@@ -2,11 +2,12 @@ name: FDA Daily Scanner
 
 on:
   schedule:
-    - cron: '30 4 * * 1-5' 
+    # 美东凌晨 00:30 (冬令时对应 UTC 05:30)
+    - cron: '30 5 * * 1-5' 
   workflow_dispatch: 
 
 permissions:
-  contents: write  # 必须开启写入权限，否则无法更新 txt
+  contents: write
 
 jobs:
   build:
@@ -21,7 +22,8 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 yfinance
+        run: |
+          pip install requests beautifulsoup4 yfinance lxml
 
       - name: Run script
         env:
@@ -33,6 +35,8 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          # 关键：如果文件不存在则创建，防止 git add 报错
+          touch seen_designations.txt
           git add seen_designations.txt
-          # 只有在文件有变动时才 commit，防止报错
+          # 只有在文件有变动时才 commit
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update seen designations" && git push)
