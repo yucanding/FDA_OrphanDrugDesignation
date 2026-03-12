@@ -1,16 +1,1 @@
-prevention of allograft rejection in liver transplantation
-treatment of Behcet disease
-treatment of Fabry disease
-treatment of NF2-related schwannomatosis (formerly NF2)
-treatment of Pitt Hopkins syndrome
-treatment of acute-on-chronic liver failure
-treatment of biotin-thiamine-responsive basal ganglia disease
-treatment of cholangiocarcinoma
-treatment of gastric cancer
-treatment of idiopathic pulmonary fibrosis
-treatment of malignant glioma
-treatment of multiple myeloma
-treatment of pancreatic cancer
-treatment of soft tissue sarcoma
-treatment of systemic sclerosis
-treatment of vernal keratoconjunctivitis
+
