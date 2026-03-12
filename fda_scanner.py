@@ -107,6 +107,9 @@ try:
                                 "content": designation
                             })
                             seen_data.add(designation)
+                        else:
+                            # 增加这一行打印，在 GitHub Actions 的日志里就能看到跳过了哪些
+                            print(f"⏭️ 跳过重复记录: {designation[:30]}...")
 
                     current_record = {}
                 elif "Date Designated:" in label: current_record['Date Designated'] = value
@@ -135,3 +138,4 @@ try:
 
 except Exception as e:
     print(f"🛑 运行错误: {e}")
+
