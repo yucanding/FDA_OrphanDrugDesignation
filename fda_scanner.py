@@ -154,7 +154,7 @@ try:
                 seen_data.add(unique_key)
 
         if records_to_send:
-            final_msg = f"<b>🧬 FDA 孤儿药获批更新 ({len(records_to_send)} 家上市企业)</b>\n\n"
+            final_msg = f"<b>🧬 FDA孤儿药认证更新 ({len(records_to_send)} 家上市企业)</b>\n\n"
             msg_blocks = []
             
             for idx, item in enumerate(records_to_send, 1):
@@ -340,4 +340,5 @@ except Exception as e:
 
 # except Exception as e:
 #     print(f"🛑 运行异常: {e}")
+
 
