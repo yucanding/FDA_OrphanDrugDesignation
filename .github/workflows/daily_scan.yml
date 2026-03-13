@@ -2,8 +2,8 @@ name: FDA Daily Scanner
 
 on:
   schedule:
-    # 美东凌晨 00:30 (冬令时对应 UTC 05:30)
-    - cron: '30 5 * * 1-5' 
+    # 美东夏令时(EDT)凌晨 00:30，周一至周五运行
+    - cron: '30 4 * * 1-5' 
   workflow_dispatch: 
 
 permissions:
@@ -21,9 +21,10 @@ jobs:
         with:
           python-version: '3.9'
 
+      # 关键更新：加入了 deep-translator 依赖
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4 yfinance lxml
+          pip install requests beautifulsoup4 yfinance lxml deep-translator
 
       - name: Run script
         env:
@@ -31,12 +32,11 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python fda_scanner.py
 
+      # 关键更新：处理新的 seen_orphan_drugs.txt 文件
       - name: Commit and Push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          # 关键：如果文件不存在则创建，防止 git add 报错
-          touch seen_designations.txt
-          git add seen_designations.txt
-          # 只有在文件有变动时才 commit
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update seen designations" && git push)
+          touch seen_orphan_drugs.txt
+          git add seen_orphan_drugs.txt
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update seen orphan drugs" && git push)
