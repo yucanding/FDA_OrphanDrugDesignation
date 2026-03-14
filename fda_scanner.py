@@ -21,14 +21,39 @@ def convert_date_to_chinese(date_str):
         # 如果解析失败，返回原字符串，确保程序不崩溃
         return date_str
 
+# def send_tg_message(text):
+#     if not TG_TOKEN or not TG_CHAT_ID:
+#         return
+#     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
+#     try:
+#         requests.post(url, json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=20)
+#     except:
+#         pass
+
 def send_tg_message(text):
-    if not TG_TOKEN or not TG_CHAT_ID:
+    # 💡 核心逻辑：确保配置存在，并将 ID 字符串切分为列表
+    if not TG_TOKEN or not TG_CHAT_ID or not text:
         return
+    
+    # 将逗号分隔的字符串转为列表，并去除多余空格
+    target_ids = [chat_id.strip() for chat_id in TG_CHAT_ID.split(',') if chat_id.strip()]
+    
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=20)
-    except:
-        pass
+    
+    # 循环遍历每一个 ID 进行发送
+    for chat_id in target_ids:
+        try:
+            # 增加对单个请求结果的监控（即使在 try 块中）
+            response = requests.post(
+                url, 
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, 
+                timeout=20
+            )
+            # 如果需要调试，可以取消下面这一行的注释
+            # print(f"发送至 {chat_id} 结果: {response.status_code}")
+        except:
+            # 保持原代码的静默处理风格
+            pass
 
 # --- 智能相似度匹配引擎 ---
 def normalize_name(name):
