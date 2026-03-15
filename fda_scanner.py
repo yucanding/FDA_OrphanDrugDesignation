@@ -188,7 +188,7 @@ try:
                 seen_data.add(unique_key)
 
         if records_to_send:
-            final_msg = f"<b>🧬 FDA孤儿药认证更新 ({len(records_to_send)} 家上市企业)</b>\n\n"
+            final_msg = f"<b>🧬 FDA孤儿药认证更新 ({len(records_to_send)}家上市企业)</b>\n\n"
             msg_blocks = []
             
             for idx, item in enumerate(records_to_send, 1):
@@ -197,10 +197,12 @@ try:
                          f"    💊适应症: {item['drug']}\n"
                          f"    💰市值: ${item['cap']}B\n"
                          f"    💵股价: ${item['price']}\n"
-                         f"    🔗链接: {item['link']}")
+                         f'    🔗<a href="{item["link"]}">点击查看公告</a>')
+                         #f"    🔗链接: {item['link']}")
                 msg_blocks.append(block)
             
             final_msg += "\n\n---------------\n\n".join(msg_blocks)
+            final_msg += "\n\n#FDA #OrphanDrugDesignations"
             send_tg_message(final_msg)
             print(f"✅ 发送了 {len(records_to_send)} 条上市企业获批信息。")
 
