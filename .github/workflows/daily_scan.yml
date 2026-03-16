@@ -2,10 +2,8 @@ name: FDA Daily Scanner
 
 on:
   schedule:
-    # 对应美东时间(EDT) 09:30 AM (UTC 13:30)
-    - cron: '30 13 * * 1-5'
-    # 对应美东时间(EDT) 12:30 PM (UTC 16:30)
-    - cron: '30 16 * * 1-5'
+    # 周一至周五，每 3 小时的第 30 分钟运行
+    - cron: '30 */3 * * 1-5'
   workflow_dispatch:
 
 permissions:
