@@ -1,9 +1,11 @@
 name: FDA Daily Scanner
 
 on:
-  schedule:
-    # 周一至周五，每 1 小时的第 30 分钟运行
-    - cron: '30 */1 * * 1-5'
+  # 1. 停用原生 Cron，避免 GitHub Actions 启动延迟
+  # schedule:
+  #   - cron: '30 */1 * * 1-5'
+
+  # 2. 必须保留，作为 cron-job.org 的入口
   workflow_dispatch:
 
 permissions:
@@ -14,14 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 升级到 v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 关键更新：加入了 deep-translator 依赖
       - name: Install dependencies
         run: |
           pip install requests beautifulsoup4 yfinance lxml deep-translator
@@ -32,11 +33,12 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python fda_scanner.py
 
-      # 关键更新：处理新的 seen_orphan_drugs.txt 文件
       - name: Commit and Push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          # 确保文件存在，防止 git add 报错
           touch seen_orphan_drugs.txt
           git add seen_orphan_drugs.txt
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update seen orphan drugs" && git push)
+          # 仅在有内容变化时提交，并使用 [skip ci]
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update seen orphan drugs [skip ci]" && git push)
