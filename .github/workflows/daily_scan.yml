@@ -2,8 +2,8 @@ name: FDA Daily Scanner
 
 on:
   schedule:
-    # 周一至周五，每 3 小时的第 30 分钟运行
-    - cron: '30 */3 * * 1-5'
+    # 周一至周五，每 1 小时的第 30 分钟运行
+    - cron: '30 */1 * * 1-5'
   workflow_dispatch:
 
 permissions:
