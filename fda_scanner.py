@@ -76,24 +76,46 @@ def is_company_match(app_name, yf_name):
 
 def get_stock_info_smart(name):
     try:
+        # 1. 缩小搜索范围，取公司名前两个单词
         search_q = ' '.join(name.split()[:2])
         search = yf.Search(search_q, max_results=3)
         if not search.quotes: return None
+        
         for q in search.quotes:
             ticker = q.get('symbol', '')
+            
+            # 过滤非美股主板（带点的代码通常是外盘或OTC）
             if "." not in ticker:
                 short_name = q.get('shortname', '')
                 long_name = q.get('longname', '')
+                
+                # 2. 基础名称相似度校验
                 if is_company_match(name, short_name) or is_company_match(name, long_name):
                     s = yf.Ticker(ticker)
-                    info = s.fast_info
+                    
+                    # --- 核心新增：Sector 判别逻辑 ---
+                    # 获取完整的 info 字典（包含行业信息）
+                    full_info = s.info 
+                    sector = full_info.get('sector', '')
+                    
+                    # 如果不是医疗健康行业，直接跳过此候选代码，继续看下一个结果
+                    if sector != 'Healthcare':
+                        print(f"⚠️ 拦截误报: {ticker} ({short_name}) 行业为 {sector}，非医药行业。")
+                        continue 
+                    # -------------------------------
+                    
+                    # 匹配成功，提取财务数据
+                    # 注意：s.info 里其实也包含价格和市值，但 fast_info 依然更稳定
+                    f_info = s.fast_info
                     return {
                         "ticker": ticker,
-                        "price": round(info.last_price, 2),
-                        "cap": round(info.market_cap / 1e9, 2)
+                        "price": round(f_info.last_price, 2),
+                        "cap": round(f_info.market_cap / 1e9, 2)
                     }
         return None
-    except: return None
+    except Exception as e:
+        # print(f"查询出错: {e}") # 调试用
+        return None
 
 # --- 1. 加载历史记录 ---
 if not os.path.exists(DB_FILE):
