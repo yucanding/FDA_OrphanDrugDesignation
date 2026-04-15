@@ -58,7 +58,8 @@ def send_tg_message(text):
 # --- 智能相似度匹配引擎 ---
 def normalize_name(name):
     if not name: return []
-    clean_str = re.sub(r'(?i)\b(inc|corp|corporation|ltd|llc|co|company|plc|lp|gmbh)\b|\.|,|-|!', ' ', name)
+    suffixes = r'\b(inc|corp|corporation|ltd|limited|llc|co|company|plc|lp|gmbh|sas|sa|ads)\b'
+    clean_str = re.sub(rf'(?i){suffixes}|\.|,|-|!', ' ', name)
     return [w for w in clean_str.upper().split() if len(w) > 1]
 
 def is_company_match(app_name, yf_name):
