@@ -188,7 +188,7 @@ try:
                 msg_blocks.append(block)
             
             final_msg += "\n\n---------------\n\n".join(msg_blocks)
-            final_msg += "\n\n#FDA #OrphanDrug #Healthcare"
+            final_msg += "\n\n#FDA #OrphanDrug"
             send_tg_message(final_msg)
             print(f"✅ 已向 Telegram 推送 {len(records_to_send)} 条更新。")
 
