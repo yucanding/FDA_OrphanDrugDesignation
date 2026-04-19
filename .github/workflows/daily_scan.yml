@@ -1,11 +1,11 @@
 name: FDA Daily Scanner
 
 on:
-  # 1. 停用原生 Cron，避免 GitHub Actions 启动延迟
-  # schedule:
-  #   - cron: '30 */1 * * 1-5'
+  # 使用原生 Cron 触发：每周日 UTC 21:00 (对应美东夏令时 17:00)
+  schedule:
+    - cron: '0 21 * * 0'
 
-  # 2. 必须保留，作为 cron-job.org 的入口
+  # 保留手动触发入口，方便测试或配合外部触发器
   workflow_dispatch:
 
 permissions:
