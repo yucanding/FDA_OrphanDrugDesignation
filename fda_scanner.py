@@ -180,7 +180,7 @@ try:
             msg_blocks = []
             for idx, item in enumerate(records_to_send, 1):
                 block = (f"{idx}. 📅日期: {item['date']}\n"
-                         f"    🏢公司: <b>${item['ticker']}</b> ({item['applicant']})\n"
+                         f"    🏢公司: ${item['ticker']} ({item['applicant']})\n"
                          f"    💊适应症: {item['drug']}\n"
                          f"    💰市值: ${item['cap']}B\n"
                          f"    💵股价: ${item['price']}\n"
