@@ -1,11 +1,9 @@
 name: FDA Daily Scanner
 
 on:
-  # 使用原生 Cron 触发：每周日 UTC 21:00 (对应美东夏令时 17:00)
   schedule:
     - cron: '0 21 * * 0'
 
-  # 保留手动触发入口，方便测试或配合外部触发器
   workflow_dispatch:
 
 permissions:
@@ -13,18 +11,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # 升级到 v4
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install requests beautifulsoup4 yfinance lxml deep-translator
 
       - name: Run script
@@ -37,8 +37,41 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          # 确保文件存在，防止 git add 报错
+
           touch seen_orphan_drugs.txt
           git add seen_orphan_drugs.txt
-          # 仅在有内容变化时提交，并使用 [skip ci]
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update seen orphan drugs [skip ci]" && git push)
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update seen orphan drugs [skip ci]"
+            git push
+          fi
+
+      - name: Notify Telegram on Failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          IFS=',' read -ra CHAT_IDS <<< "$TG_CHAT_ID"
+
+          MESSAGE="🚨 FDA Daily Scanner 运行失败！
+
+          Workflow: ${{ github.workflow }}
+          Run: #${RUN_NUMBER}
+
+          错误日志：
+          ${RUN_URL}"
+
+          for CID in "${CHAT_IDS[@]}"; do
+            CID=$(echo "$CID" | xargs)
+            [ -z "$CID" ] && continue
+
+            curl --fail-with-body --silent --show-error \
+              -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${CID}" \
+              --data-urlencode "text=${MESSAGE}"
+          done
