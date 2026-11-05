@@ -31,8 +31,8 @@ HEADERS = {
 
 REQUEST_TIMEOUT = 30
 
-# Telegram 单条消息长度预留空间
-TELEGRAM_MAX_LENGTH = 3800
+# Telegram 消息长度预留空间
+TELEGRAM_MAX_LENGTH = 3000
 
 
 # ============================================================
@@ -41,11 +41,13 @@ TELEGRAM_MAX_LENGTH = 3800
 
 def convert_date_to_chinese(date_str):
     """将 MM/DD/YYYY 转换为中文日期"""
+
     try:
         dt = datetime.strptime(
             date_str.strip(),
             "%m/%d/%Y"
         )
+
         return f"{dt.year}年{dt.month}月{dt.day}日"
 
     except Exception:
@@ -109,14 +111,13 @@ def send_tg_message(text):
                 )
 
             print(
-                f"✅ Telegram 推送成功: {chat_id}"
+                f"Telegram 推送成功: {chat_id}"
             )
 
         except Exception as e:
 
             print(
-                f"❌ Telegram 推送失败 "
-                f"[{chat_id}]: {e}"
+                f"Telegram 推送失败 [{chat_id}]: {e}"
             )
 
             errors.append(
@@ -145,11 +146,15 @@ def send_messages_in_chunks(header, blocks, footer):
 
     for block in blocks:
 
+        candidate_blocks = (
+            current_blocks + [block]
+        )
+
         candidate = (
             header
             + "\n\n"
             + "\n\n---------------\n\n".join(
-                current_blocks + [block]
+                candidate_blocks
             )
             + footer
         )
@@ -174,6 +179,7 @@ def send_messages_in_chunks(header, blocks, footer):
             current_blocks.append(block)
 
     if current_blocks:
+
         messages.append(
             header
             + "\n\n"
@@ -186,9 +192,9 @@ def send_messages_in_chunks(header, blocks, footer):
     for index, message in enumerate(messages, 1):
 
         if len(messages) > 1:
-            message = (
-                message
-                + f"\n\n<i>消息分段: {index}/{len(messages)}</i>"
+            message += (
+                f"\n\n<i>消息分段: "
+                f"{index}/{len(messages)}</i>"
             )
 
         send_tg_message(message)
@@ -260,7 +266,7 @@ def get_stock_info_smart(name):
         检索成功，但没有符合条件的公司。
 
     error:
-        查询过程中出现异常，应该下次重新尝试。
+        查询过程中出现异常，下次重新尝试。
     """
 
     try:
@@ -272,10 +278,12 @@ def get_stock_info_smart(name):
                 "status": "no_match"
             }
 
-        search_q = " ".join(core_words[:2])
+        search_q = " ".join(
+            core_words[:2]
+        )
 
         print(
-            f"🔎 Yahoo Finance 搜索: {search_q}"
+            f"Yahoo Finance 搜索: {search_q}"
         )
 
         search = yf.Search(
@@ -297,27 +305,41 @@ def get_stock_info_smart(name):
             if not ticker:
                 continue
 
-            short_name = q.get("shortname", "")
-            long_name = q.get("longname", "")
+            short_name = q.get(
+                "shortname", ""
+            )
+
+            long_name = q.get(
+                "longname", ""
+            )
 
             matched = (
-                is_company_match(name, short_name)
-                or is_company_match(name, long_name)
+                is_company_match(
+                    name,
+                    short_name
+                )
+                or is_company_match(
+                    name,
+                    long_name
+                )
             )
 
             if not matched:
                 continue
 
             print(
-                f"🔍 公司名称匹配: {name} -> {ticker}"
+                f"公司名称匹配: {name} -> {ticker}"
             )
 
             try:
 
                 stock = yf.Ticker(ticker)
+
                 info = stock.info
 
-                sector = info.get("sector", "")
+                sector = info.get(
+                    "sector", ""
+                )
 
                 currency = (
                     info.get("currency")
@@ -325,8 +347,7 @@ def get_stock_info_smart(name):
                     or ""
                 )
 
-                # 行业或货币信息缺失：
-                # 无法确认是否符合条件，保留重试机会
+                # 信息缺失时不能确认是否符合条件
                 if not sector or not currency:
 
                     query_errors.append(
@@ -335,15 +356,14 @@ def get_stock_info_smart(name):
 
                     continue
 
-                # 非 Healthcare 或非 USD：
-                # 确认不符合筛选条件
+                # 非 Healthcare 或非 USD
                 if (
                     sector != "Healthcare"
                     or currency != "USD"
                 ):
 
                     print(
-                        f"⏭️ 排除 {ticker}: "
+                        f"排除 {ticker}: "
                         f"Sector={sector}, "
                         f"Currency={currency}"
                     )
@@ -353,16 +373,20 @@ def get_stock_info_smart(name):
                 fast_info = stock.fast_info
 
                 last_price = fast_info.last_price
+
                 market_cap = fast_info.market_cap
 
                 return {
                     "status": "match",
+
                     "ticker": ticker,
+
                     "price": (
                         round(last_price, 2)
                         if last_price is not None
                         else 0
                     ),
+
                     "cap": (
                         round(market_cap / 1e9, 2)
                         if market_cap is not None
@@ -373,7 +397,7 @@ def get_stock_info_smart(name):
             except Exception as e:
 
                 print(
-                    f"⚠️ Yahoo Finance 查询失败 "
+                    f"Yahoo Finance 查询失败 "
                     f"[{ticker}]: {e}"
                 )
 
@@ -381,12 +405,11 @@ def get_stock_info_smart(name):
                     f"{ticker}: {e}"
                 )
 
-        # 如果有匹配候选公司查询失败，
-        # 不能简单地认定该企业不符合条件
+        # 候选公司查询失败，保留重试机会
         if query_errors:
 
             print(
-                f"⚠️ 公司检索结果不确定 [{name}]"
+                f"公司检索结果不确定 [{name}]"
             )
 
             return {
@@ -401,7 +424,7 @@ def get_stock_info_smart(name):
     except Exception as e:
 
         print(
-            f"⚠️ Yahoo Finance 搜索异常 [{name}]: {e}"
+            f"Yahoo Finance 搜索异常 [{name}]: {e}"
         )
 
         return {
@@ -438,7 +461,7 @@ def fetch_fda_records():
     }
 
     print(
-        f"📡 正在获取 FDA 数据: "
+        f"正在获取 FDA 数据: "
         f"{start_date} - {end_date}"
     )
 
@@ -473,7 +496,9 @@ def fetch_fda_records():
 
     headers_list = [
         th.get_text(strip=True)
-        for th in rows[0].find_all(["th", "td"])
+        for th in rows[0].find_all(
+            ["th", "td"]
+        )
     ]
 
     if not headers_list:
@@ -514,7 +539,7 @@ def fetch_fda_records():
         )
 
     print(
-        f"✅ FDA 获取完成，解析到 "
+        f"FDA 获取完成，解析到 "
         f"{len(parsed_records)} 条记录"
     )
 
@@ -591,12 +616,19 @@ def get_unique_key(record):
     if cfgridkey:
         return cfgridkey
 
-    # CF Grid Key 缺失时使用组合键，
-    # 避免不同公司同名药物发生冲突
+    # CF Grid Key 缺失时使用组合键
     return "|".join([
-        record.get("Sponsor Company", "").strip(),
-        record.get("Orphan Designation", "").strip(),
-        record.get("Date Designated", "").strip()
+        record.get(
+            "Sponsor Company", ""
+        ).strip(),
+
+        record.get(
+            "Orphan Designation", ""
+        ).strip(),
+
+        record.get(
+            "Date Designated", ""
+        ).strip()
     ])
 
 
@@ -607,19 +639,20 @@ def get_unique_key(record):
 def run():
 
     print("=" * 55)
-    print("🧬 FDA Orphan Drug Scanner")
+    print("FDA Orphan Drug Scanner")
     print("=" * 55)
 
+    # 1. 加载历史数据库
     seen_data = load_seen_data()
 
     print(
-        f"📚 已加载历史记录: {len(seen_data)} 条"
+        f"已加载历史记录: {len(seen_data)} 条"
     )
 
-    # 1. 获取 FDA 数据
+    # 2. 获取 FDA 数据
     parsed_records = fetch_fda_records()
 
-    # 2. 初始化
+    # 3. 初始化
     translator = GoogleTranslator(
         source="en",
         target="zh-CN"
@@ -627,11 +660,13 @@ def run():
 
     records_to_send = []
 
-    # 仅在确认处理完成后加入
-    # 查询失败的记录保留到下一次重试
+    # 确认成功处理的非上市公司记录
     processed_this_run = set()
 
-    # 3. 遍历 FDA 记录
+    # Yahoo Finance 查询失败的记录数
+    retry_count = 0
+
+    # 4. 遍历 FDA 记录
     for rec in parsed_records:
 
         applicant = rec.get(
@@ -653,7 +688,7 @@ def run():
 
         if not unique_key:
             print(
-                "⚠️ 跳过缺少唯一标识的 FDA 记录"
+                "跳过缺少唯一标识的 FDA 记录"
             )
             continue
 
@@ -664,36 +699,41 @@ def run():
             continue
 
         if not applicant or applicant == "N/A":
+
             print(
-                f"⚠️ 缺少 Sponsor Company: {unique_key}"
+                f"缺少 Sponsor Company: {unique_key}"
             )
+
             continue
 
         print(
-            f"\n📋 正在处理: {applicant}"
+            f"\n正在处理: {applicant}"
         )
 
-        # 4. 查询公司
-        stock = get_stock_info_smart(applicant)
+        # 5. 查询公司
+        stock = get_stock_info_smart(
+            applicant
+        )
 
         time.sleep(0.4)
 
         # 查询失败：不写入数据库，下次重试
         if stock["status"] == "error":
 
+            retry_count += 1
+
             print(
-                f"🔄 暂不标记，等待下次重试: "
+                f"暂不标记，等待下次重试: "
                 f"{applicant}"
             )
 
             continue
 
-        # 查询成功但不符合条件：
-        # 标记为已处理，避免重复查询
+        # 查询成功但不符合条件
         if stock["status"] == "no_match":
 
             print(
-                f"⏭️ 未找到符合条件的美股公司: "
+                f"未找到符合条件的美股公司: "
                 f"{applicant}"
             )
 
@@ -703,7 +743,7 @@ def run():
 
             continue
 
-        # 5. 翻译药物名称
+        # 6. 翻译药物名称
         try:
 
             drug_cn = translator.translate(
@@ -716,26 +756,30 @@ def run():
         except Exception as e:
 
             print(
-                f"⚠️ 翻译失败 [{drug_en}]: {e}"
+                f"翻译失败 [{drug_en}]: {e}"
             )
 
             drug_cn = drug_en
 
-        # 6. 生成 FDA 公告链接
+        # 7. 生成 FDA 公告链接
         cfgridkey = rec.get(
             "CF Grid Key",
             ""
         ).strip()
 
-        link = (
-            "https://www.accessdata.fda.gov/"
-            "scripts/opdlisting/oopd/"
-            f"detailedIndex.cfm?cfgridkey={cfgridkey}"
-            if cfgridkey
-            else FDA_URL
-        )
+        if cfgridkey:
 
-        # 7. 保存推送数据
+            link = (
+                "https://www.accessdata.fda.gov/"
+                "scripts/opdlisting/oopd/"
+                "detailedIndex.cfm"
+                f"?cfgridkey={cfgridkey}"
+            )
+
+        else:
+            link = FDA_URL
+
+        # 8. 保存推送数据
         records_to_send.append({
 
             "date": convert_date_to_chinese(
@@ -758,15 +802,15 @@ def run():
         })
 
         print(
-            f"✅ 捕获符合条件的公司: "
+            f"捕获符合条件的公司: "
             f"{stock['ticker']}"
         )
 
-    # 8. 发送 Telegram
+    # 9. 发送 Telegram
     if records_to_send:
 
         print(
-            f"\n📨 准备推送 "
+            f"\n准备推送 "
             f"{len(records_to_send)} 条更新"
         )
 
@@ -777,7 +821,7 @@ def run():
             1
         ):
 
-            # HTML 转义，避免特殊字符破坏 Telegram HTML
+            # HTML 转义
             ticker = html.escape(
                 str(item["ticker"])
             )
@@ -827,8 +871,8 @@ def run():
 
         footer = "\n\n#FDA #OrphanDrug"
 
-        # 发送失败会直接抛出异常，
-        # 后续不会更新去重数据库
+        # 如果发送失败，抛出异常
+        # 不会继续更新去重数据库
         send_messages_in_chunks(
             header,
             blocks,
@@ -836,65 +880,59 @@ def run():
         )
 
         print(
-            f"✅ Telegram 推送完成: "
+            f"Telegram 推送完成: "
             f"{len(records_to_send)} 条更新"
         )
 
     else:
 
         print(
-            "\n📭 本次没有发现符合条件的新记录"
+            "\n本次没有发现符合条件的新记录"
         )
 
-    # 9. 所有消息成功发送后，
-    # 才将成功处理的记录写入数据库
+    # 10. 更新去重数据库
     #
-    # 没有匹配到美股公司的记录也会标记；
-    # 查询失败的记录不会标记。
+    # 确认不符合条件的记录：写入
+    # 符合条件且推送成功的记录：写入
+    # 查询失败的记录：不写入，等待下次重试
+
     updated_seen_data = (
         seen_data | processed_this_run
     )
 
-    updated_seen_data.update(
-        item["unique_key"]
-        for item in records_to_send
-    )
+    for item in records_to_send:
+
+        updated_seen_data.add(
+            item["unique_key"]
+        )
 
     save_seen_data(
         updated_seen_data
     )
 
+    # 11. 运行统计
     print("\n" + "=" * 55)
 
+    print("扫描结束")
+
     print(
-        f"✅ 扫描结束"
+        f"FDA 原始记录: {len(parsed_records)}"
     )
 
     print(
-        f"📊 FDA 原始记录: {len(parsed_records)}"
+        f"符合条件的推送: {len(records_to_send)}"
     )
 
     print(
-        f"📨 符合条件的推送: {len(records_to_send)}"
+        f"确认不符合条件: {len(processed_this_run)}"
     )
 
     print(
-        f"⏭️ 确认不符合条件: "
-        f"{len(processed_this_run)}"
+        f"待重试记录: {retry_count}"
     )
 
     print(
-        f"🔄 待重试记录: "
-        f"{sum(1 for rec in parsed_records "
-        f"if get_unique_key(rec) "
-        f"and get_unique_key(rec) not in seen_data "
-        f"and get_unique_key(rec) not in processed_this_run "
-        f"and not any(item['unique_key'] == get_unique_key(rec) "
-        f"for item in records_to_send))}"
-    )
-
-    print(
-        f"📚 当前去重数据库: "
+        f"当前去重数据库: "
         f"{len(updated_seen_data)} 条"
     )
 
@@ -908,12 +946,13 @@ def run():
 if __name__ == "__main__":
 
     try:
+
         run()
 
     except Exception as e:
 
         print(
-            f"\n🚨 FDA Scanner 运行异常: {e}"
+            f"\nFDA Scanner 运行异常: {e}"
         )
 
         raise
