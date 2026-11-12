@@ -29,7 +29,20 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
-REQUEST_TIMEOUT = 30
+# FDA 请求配置
+REQUEST_CONNECT_TIMEOUT = 15
+REQUEST_READ_TIMEOUT = 90
+
+# 最多请求次数（包含第一次）
+FDA_MAX_RETRIES = 4
+
+# 重试等待时间（秒）
+FDA_RETRY_DELAYS = [5, 15, 30]
+
+# 可重试的 HTTP 状态码
+FDA_RETRY_STATUS_CODES = {
+    429, 500, 502, 503, 504
+}
 
 # Telegram 消息长度预留空间
 TELEGRAM_MAX_LENGTH = 3000
@@ -437,6 +450,7 @@ def get_stock_info_smart(name):
 # FDA 数据获取
 # ============================================================
 
+
 def fetch_fda_records():
 
     today = date.today()
@@ -465,31 +479,172 @@ def fetch_fda_records():
         f"{start_date} - {end_date}"
     )
 
-    response = requests.post(
-        FDA_URL,
-        data=payload,
-        headers=HEADERS,
-        timeout=REQUEST_TIMEOUT
-    )
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,"
+            "application/xml;q=0.9,*/*;q=0.8"
+        ),
+        "Referer": FDA_URL,
+        "Connection": "close"
+    }
 
-    response.raise_for_status()
+    response = None
+    last_error = None
+
+    # ==================================================
+    # FDA 请求与重试
+    # ==================================================
+
+    with requests.Session() as session:
+
+        for attempt in range(1, FDA_MAX_RETRIES + 1):
+
+            try:
+
+                print(
+                    f"FDA 请求第 {attempt}/"
+                    f"{FDA_MAX_RETRIES} 次..."
+                )
+
+                response = session.post(
+                    FDA_URL,
+                    data=payload,
+                    headers=headers,
+                    timeout=(
+                        REQUEST_CONNECT_TIMEOUT,
+                        REQUEST_READ_TIMEOUT
+                    )
+                )
+
+                # HTTP 状态码检查
+                if response.status_code in FDA_RETRY_STATUS_CODES:
+
+                    raise requests.exceptions.HTTPError(
+                        f"FDA HTTP {response.status_code}"
+                    )
+
+                response.raise_for_status()
+
+                # 检查响应内容
+                if not response.content:
+
+                    raise RuntimeError(
+                        "FDA 返回空响应"
+                    )
+
+                # 检查是否为 HTML
+                content_type = response.headers.get(
+                    "Content-Type", ""
+                ).lower()
+
+                if (
+                    "html" not in content_type
+                    and "text" not in content_type
+                ):
+
+                    raise RuntimeError(
+                        f"FDA 返回异常 Content-Type: "
+                        f"{content_type}"
+                    )
+
+                print(
+                    f"FDA 请求成功，HTTP "
+                    f"{response.status_code}，"
+                    f"响应大小: "
+                    f"{len(response.content)} bytes"
+                )
+
+                break
+
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError
+            ) as e:
+
+                last_error = e
+
+                print(
+                    f"FDA 请求失败 "
+                    f"[{attempt}/{FDA_MAX_RETRIES}]: {e}"
+                )
+
+                if attempt >= FDA_MAX_RETRIES:
+                    break
+
+                # 对 HTTP 错误进行区分
+                if isinstance(
+                    e,
+                    requests.exceptions.HTTPError
+                ):
+
+                    status_code = (
+                        e.response.status_code
+                        if e.response is not None
+                        else None
+                    )
+
+                    if (
+                        status_code is not None
+                        and status_code not in FDA_RETRY_STATUS_CODES
+                    ):
+
+                        raise RuntimeError(
+                            f"FDA 返回不可重试的 HTTP "
+                            f"错误: {status_code}"
+                        ) from e
+
+                delay = FDA_RETRY_DELAYS[
+                    min(
+                        attempt - 1,
+                        len(FDA_RETRY_DELAYS) - 1
+                    )
+                ]
+
+                print(
+                    f"等待 {delay} 秒后重试..."
+                )
+
+                time.sleep(delay)
+
+    # 所有请求均失败
+    if response is None:
+
+        raise RuntimeError(
+            f"FDA 数据获取失败，已重试 "
+            f"{FDA_MAX_RETRIES} 次。"
+            f"最后错误: {last_error}"
+        ) from last_error
+
+    # ==================================================
+    # HTML 解析
+    # ==================================================
 
     soup = BeautifulSoup(
-        response.text,
+        response.content,
         "html.parser"
     )
 
     table = soup.find("table")
 
     if table is None:
+
         raise RuntimeError(
             "FDA 页面没有找到数据表格，"
-            "可能是网页结构发生变化或返回内容异常"
+            "可能是网页结构变化、反爬拦截"
+            "或服务器返回异常页面"
         )
 
     rows = table.find_all("tr")
 
     if not rows:
+
         raise RuntimeError(
             "FDA 页面数据表格为空"
         )
@@ -502,6 +657,7 @@ def fetch_fda_records():
     ]
 
     if not headers_list:
+
         raise RuntimeError(
             "FDA 数据表格没有有效表头"
         )
@@ -517,6 +673,7 @@ def fetch_fda_records():
     )
 
     if missing_columns:
+
         raise RuntimeError(
             "FDA 数据表格缺少必要字段: "
             + ", ".join(missing_columns)
@@ -544,6 +701,7 @@ def fetch_fda_records():
     )
 
     return parsed_records
+
 
 
 # ============================================================
