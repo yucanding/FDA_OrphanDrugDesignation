@@ -531,11 +531,22 @@ def fetch_fda_records():
                 print(f"等待 {delay} 秒后重试...")
                 time.sleep(delay)
 
-    if response is None:
-        raise RuntimeError(
+    # 所有请求均失败，或最后一次仍是错误状态
+    if (
+        response is None
+        or response.status_code in FDA_RETRY_STATUS_CODES
+        or response.status_code >= 400
+        or b"Accessdata Error" in response.content
+        or b"currently unavailable" in response.content
+    ):
+        msg = (
             f"FDA 数据获取失败，已重试 {FDA_MAX_RETRIES} 次。"
             f"最后错误: {last_error}"
-        ) from last_error
+        )
+        print(msg)
+        # 定时任务遇到 FDA 临时 503 时，安静跳过，不让 workflow 失败
+        print("本次跳过扫描，等待下次运行。")
+        return []
 
     # ==================================================
     # 解析 Detailed 格式（竖排 key-value）
