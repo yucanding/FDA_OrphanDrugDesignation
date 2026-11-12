@@ -452,13 +452,8 @@ def get_stock_info_smart(name):
 
 
 def fetch_fda_records():
-
     today = date.today()
-
-    start_date = (
-        today - timedelta(days=7)
-    ).strftime("%m/%d/%Y")
-
+    start_date = (today - timedelta(days=7)).strftime("%m/%d/%Y")
     end_date = today.strftime("%m/%d/%Y")
 
     payload = {
@@ -468,242 +463,199 @@ def fetch_fda_records():
         "Designation_Start_Date": start_date,
         "Designation_End_Date": end_date,
         "Search_param": "DESDATE",
-        "Output_Format": "Detailed",          # ← 改成 Detailed（注意大写 F）
+        "Output_Format": "Detailed",          # 必须用 Detailed，才能拿到 Sponsor
         "Sort_order": "Date_Reverse_Order",
         "RecordsPerPage": "100",
         "newSearch": "Run Search"
     }
 
-    print(
-        f"正在获取 FDA 数据: "
-        f"{start_date} - {end_date}"
-    )
+    print(f"正在获取 FDA 数据: {start_date} - {end_date}")
 
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "(KHTML, like Gecko) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/130.0.0.0 Safari/537.36"
         ),
-        "Accept": (
-            "text/html,application/xhtml+xml,"
-            "application/xml;q=0.9,*/*;q=0.8"
-        ),
-        "Referer": FDA_URL,
-        "Connection": "close"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.accessdata.fda.gov/scripts/opdlisting/oopd/index.cfm",
+        "Origin": "https://www.accessdata.fda.gov",
+        "Connection": "keep-alive",
     }
 
     response = None
     last_error = None
 
-    # ==================================================
-    # FDA 请求与重试
-    # ==================================================
-
     with requests.Session() as session:
+        # 先访问首页拿 cookie
+        try:
+            session.get(
+                "https://www.accessdata.fda.gov/scripts/opdlisting/oopd/index.cfm",
+                headers=headers,
+                timeout=(15, 30)
+            )
+        except Exception:
+            pass
 
         for attempt in range(1, FDA_MAX_RETRIES + 1):
-
             try:
-
-                print(
-                    f"FDA 请求第 {attempt}/"
-                    f"{FDA_MAX_RETRIES} 次..."
-                )
-
+                print(f"FDA 请求第 {attempt}/{FDA_MAX_RETRIES} 次...")
                 response = session.post(
                     FDA_URL,
                     data=payload,
                     headers=headers,
-                    timeout=(
-                        REQUEST_CONNECT_TIMEOUT,
-                        REQUEST_READ_TIMEOUT
-                    )
+                    timeout=(REQUEST_CONNECT_TIMEOUT, REQUEST_READ_TIMEOUT)
                 )
 
-                # HTTP 状态码检查
                 if response.status_code in FDA_RETRY_STATUS_CODES:
-
                     raise requests.exceptions.HTTPError(
-                        f"FDA HTTP {response.status_code}"
+                        f"FDA HTTP {response.status_code}",
+                        response=response
                     )
 
                 response.raise_for_status()
 
-                # 检查响应内容
                 if not response.content:
+                    raise RuntimeError("FDA 返回空响应")
 
-                    raise RuntimeError(
-                        "FDA 返回空响应"
-                    )
-
-                # 检查是否为 HTML
-                content_type = response.headers.get(
-                    "Content-Type", ""
-                ).lower()
-
-                # 允许 HTML 或 text
+                content_type = response.headers.get("Content-Type", "").lower()
                 if "html" not in content_type and "text" not in content_type:
-                    # 如果意外返回了 Excel，也给出更明确的提示
-                    if "excel" in content_type or "msexcel" in content_type or "spreadsheet" in content_type:
+                    if "excel" in content_type or "msexcel" in content_type:
                         raise RuntimeError(
-                            "FDA 返回了 Excel 文件，但当前代码只支持 HTML 解析。"
-                            "请把 Output_Format 改成 'Detailed' 或 'Short'。"
+                            "FDA 返回了 Excel 文件，当前代码只支持 HTML Detailed 解析。"
                         )
-                    raise RuntimeError(
-                        f"FDA 返回异常 Content-Type: {content_type}"
-                    )
+                    raise RuntimeError(f"FDA 返回异常 Content-Type: {content_type}")
+
+                # 检查是否是官方错误页
+                if b"Accessdata Error" in response.content or b"currently unavailable" in response.content:
+                    raise RuntimeError("FDA 返回官方错误页（服务不可用）")
 
                 print(
-                    f"FDA 请求成功，HTTP "
-                    f"{response.status_code}，"
-                    f"响应大小: "
-                    f"{len(response.content)} bytes"
+                    f"FDA 请求成功，HTTP {response.status_code}，"
+                    f"响应大小: {len(response.content)} bytes"
                 )
-
                 break
 
             except (
                 requests.exceptions.Timeout,
                 requests.exceptions.ConnectionError,
-                requests.exceptions.HTTPError
+                requests.exceptions.HTTPError,
+                RuntimeError
             ) as e:
-
                 last_error = e
-
-                print(
-                    f"FDA 请求失败 "
-                    f"[{attempt}/{FDA_MAX_RETRIES}]: {e}"
-                )
-
+                print(f"FDA 请求失败 [{attempt}/{FDA_MAX_RETRIES}]: {e}")
                 if attempt >= FDA_MAX_RETRIES:
                     break
-
-                # 对 HTTP 错误进行区分
-                if isinstance(
-                    e,
-                    requests.exceptions.HTTPError
-                ):
-
-                    status_code = (
-                        e.response.status_code
-                        if e.response is not None
-                        else None
-                    )
-
-                    if (
-                        status_code is not None
-                        and status_code not in FDA_RETRY_STATUS_CODES
-                    ):
-
-                        raise RuntimeError(
-                            f"FDA 返回不可重试的 HTTP "
-                            f"错误: {status_code}"
-                        ) from e
-
-                delay = FDA_RETRY_DELAYS[
-                    min(
-                        attempt - 1,
-                        len(FDA_RETRY_DELAYS) - 1
-                    )
-                ]
-
-                print(
-                    f"等待 {delay} 秒后重试..."
-                )
-
+                delay = FDA_RETRY_DELAYS[min(attempt - 1, len(FDA_RETRY_DELAYS) - 1)]
+                print(f"等待 {delay} 秒后重试...")
                 time.sleep(delay)
 
-    # 所有请求均失败
     if response is None:
-
         raise RuntimeError(
-            f"FDA 数据获取失败，已重试 "
-            f"{FDA_MAX_RETRIES} 次。"
+            f"FDA 数据获取失败，已重试 {FDA_MAX_RETRIES} 次。"
             f"最后错误: {last_error}"
         ) from last_error
 
     # ==================================================
-    # HTML 解析
+    # 解析 Detailed 格式（竖排 key-value）
     # ==================================================
-
-    soup = BeautifulSoup(
-        response.content,
-        "html.parser"
-    )
-
-    table = soup.find("table")
+    soup = BeautifulSoup(response.content, "html.parser")
+    table = soup.find("table", class_="resultstable")
+    if table is None:
+        # 兼容没有 class 的情况，找最大的表格
+        tables = soup.find_all("table")
+        table = max(tables, key=lambda t: len(t.find_all("tr"))) if tables else None
 
     if table is None:
-
         raise RuntimeError(
             "FDA 页面没有找到数据表格，"
-            "可能是网页结构变化、反爬拦截"
-            "或服务器返回异常页面"
+            "可能是网页结构变化或服务器返回异常页面"
         )
 
     rows = table.find_all("tr")
-
     if not rows:
+        raise RuntimeError("FDA 页面数据表格为空")
 
-        raise RuntimeError(
-            "FDA 页面数据表格为空"
-        )
-
-    headers_list = [
-        th.get_text(strip=True)
-        for th in rows[0].find_all(
-            ["th", "td"]
-        )
-    ]
-
-    if not headers_list:
-
-        raise RuntimeError(
-            "FDA 数据表格没有有效表头"
-        )
-
-    required_columns = {
-        "Sponsor Company",
-        "Orphan Designation",
-        "Date Designated"
-    }
-
-    missing_columns = (
-        required_columns - set(headers_list)
-    )
-
-    if missing_columns:
-
-        raise RuntimeError(
-            "FDA 数据表格缺少必要字段: "
-            + ", ".join(missing_columns)
-        )
-
+    # 把竖排 key-value 解析成一条条记录
     parsed_records = []
+    current = {}
 
-    for row in rows[1:]:
+    def clean_sponsor(raw: str) -> str:
+        """从 Sponsor 字段里尽量只保留公司名"""
+        if not raw:
+            return ""
+        # 去掉常见后缀说明
+        raw = raw.replace(
+            "The sponsor address listed is the last reported by the sponsor to OOPD.",
+            ""
+        ).strip()
+        # 简单启发式：取第一段看起来像公司名的部分（遇到数字开头的地址就截断）
+        # 更稳妥的做法：取到第一个明显的地址特征之前
+        for sep in [" P.O. Box", " PO Box", " Suite ", " Floor ", " Building "]:
+            if sep in raw:
+                raw = raw.split(sep)[0].strip()
+                break
+        # 如果还有很长的地址，按逗号截一段
+        parts = raw.split(",")
+        if len(parts) > 1 and any(c.isdigit() for c in parts[0]):
+            # 第一段就含数字，可能已经是地址，保留原样
+            return raw.strip()
+        # 否则保留前两段（公司名 + 可能的城市）
+        return ",".join(parts[:2]).strip() if len(parts) >= 2 else raw.strip()
 
-        cells = [
-            td.get_text(strip=True)
-            for td in row.find_all("td")
-        ]
-
-        if len(cells) != len(headers_list):
+    for row in rows:
+        cells = [td.get_text(" ", strip=True) for td in row.find_all(["td", "th"])]
+        if len(cells) < 2:
+            # 空行 → 当前记录结束
+            if current:
+                # 标准化字段名，方便后面代码复用
+                record = {
+                    "Generic Name": current.get("Generic Name", ""),
+                    "Sponsor Company": clean_sponsor(current.get("Sponsor", "")),
+                    "Orphan Designation": current.get("Orphan Designation", ""),
+                    "Date Designated": current.get("Date Designated", ""),
+                    "Orphan Designation Status": current.get("Orphan Designation Status", ""),
+                    "CF Grid Key": "",  # Detailed 列表里没有这个字段
+                }
+                if record["Orphan Designation"] or record["Sponsor Company"]:
+                    parsed_records.append(record)
+                current = {}
             continue
 
-        parsed_records.append(
-            dict(zip(headers_list, cells))
-        )
+        key = cells[0].rstrip(":").strip()
+        value = cells[1].strip() if len(cells) > 1 else ""
 
-    print(
-        f"FDA 获取完成，解析到 "
-        f"{len(parsed_records)} 条记录"
-    )
+        # 统一一些可能的变体
+        key_map = {
+            "Result Number": "Result Number",
+            "Generic Name": "Generic Name",
+            "Date Designated": "Date Designated",
+            "Orphan Designation": "Orphan Designation",
+            "Orphan Designation Status": "Orphan Designation Status",
+            "FDA Orphan Approval Status": "FDA Orphan Approval Status",
+            "Sponsor": "Sponsor",
+        }
+        # 处理可能的特殊空格字符
+        key_normalized = key.replace("\xa0", " ").strip()
+        mapped = key_map.get(key_normalized, key_normalized)
+        current[mapped] = value
 
+    # 处理最后一条记录
+    if current:
+        record = {
+            "Generic Name": current.get("Generic Name", ""),
+            "Sponsor Company": clean_sponsor(current.get("Sponsor", "")),
+            "Orphan Designation": current.get("Orphan Designation", ""),
+            "Date Designated": current.get("Date Designated", ""),
+            "Orphan Designation Status": current.get("Orphan Designation Status", ""),
+            "CF Grid Key": "",
+        }
+        if record["Orphan Designation"] or record["Sponsor Company"]:
+            parsed_records.append(record)
+
+    print(f"FDA 获取完成，解析到 {len(parsed_records)} 条记录")
     return parsed_records
-
 
 
 # ============================================================
@@ -767,28 +719,16 @@ def save_seen_data(seen_data):
 
 def get_unique_key(record):
     """生成稳定的 FDA 记录唯一 ID"""
-
-    cfgridkey = record.get(
-        "CF Grid Key",
-        ""
-    ).strip()
-
+    cfgridkey = record.get("CF Grid Key", "").strip()
     if cfgridkey:
         return cfgridkey
 
-    # CF Grid Key 缺失时使用组合键
+    # Detailed 格式没有 CF Grid Key，用组合键
     return "|".join([
-        record.get(
-            "Sponsor Company", ""
-        ).strip(),
-
-        record.get(
-            "Orphan Designation", ""
-        ).strip(),
-
-        record.get(
-            "Date Designated", ""
-        ).strip()
+        record.get("Sponsor Company", "").strip(),
+        record.get("Orphan Designation", "").strip(),
+        record.get("Date Designated", "").strip(),
+        record.get("Generic Name", "").strip(),
     ])
 
 
