@@ -468,7 +468,7 @@ def fetch_fda_records():
         "Designation_Start_Date": start_date,
         "Designation_End_Date": end_date,
         "Search_param": "DESDATE",
-        "Output_format": "Excel",
+        "Output_Format": "Detailed",          # ← 改成 Detailed（注意大写 F）
         "Sort_order": "Date_Reverse_Order",
         "RecordsPerPage": "100",
         "newSearch": "Run Search"
@@ -543,14 +543,16 @@ def fetch_fda_records():
                     "Content-Type", ""
                 ).lower()
 
-                if (
-                    "html" not in content_type
-                    and "text" not in content_type
-                ):
-
+                # 允许 HTML 或 text
+                if "html" not in content_type and "text" not in content_type:
+                    # 如果意外返回了 Excel，也给出更明确的提示
+                    if "excel" in content_type or "msexcel" in content_type or "spreadsheet" in content_type:
+                        raise RuntimeError(
+                            "FDA 返回了 Excel 文件，但当前代码只支持 HTML 解析。"
+                            "请把 Output_Format 改成 'Detailed' 或 'Short'。"
+                        )
                     raise RuntimeError(
-                        f"FDA 返回异常 Content-Type: "
-                        f"{content_type}"
+                        f"FDA 返回异常 Content-Type: {content_type}"
                     )
 
                 print(
