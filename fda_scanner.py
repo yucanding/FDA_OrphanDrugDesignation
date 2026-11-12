@@ -150,7 +150,6 @@ def send_tg_message(text):
 
 def send_messages_in_chunks(header, blocks, footer):
     """按照 Telegram 消息长度限制拆分推送"""
-
     if not blocks:
         return
 
@@ -158,58 +157,39 @@ def send_messages_in_chunks(header, blocks, footer):
     current_blocks = []
 
     for block in blocks:
-
-        candidate_blocks = (
-            current_blocks + [block]
-        )
-
+        candidate_blocks = current_blocks + [block]
         candidate = (
             header
             + "\n\n"
-            + "\n\n---------------\n\n".join(
-                candidate_blocks
-            )
+            + "\n\n".join(candidate_blocks)   # ← 改这里
             + footer
         )
 
-        if (
-            len(candidate) > TELEGRAM_MAX_LENGTH
-            and current_blocks
-        ):
-
+        if len(candidate) > TELEGRAM_MAX_LENGTH and current_blocks:
             messages.append(
                 header
                 + "\n\n"
-                + "\n\n---------------\n\n".join(
-                    current_blocks
-                )
+                + "\n\n".join(current_blocks)   # ← 改这里
                 + footer
             )
-
             current_blocks = [block]
-
         else:
             current_blocks.append(block)
 
     if current_blocks:
-
         messages.append(
             header
             + "\n\n"
-            + "\n\n---------------\n\n".join(
-                current_blocks
-            )
+            + "\n\n".join(current_blocks)       # ← 改这里
             + footer
         )
 
     for index, message in enumerate(messages, 1):
-
         if len(messages) > 1:
             message += (
                 f"\n\n<i>消息分段: "
                 f"{index}/{len(messages)}</i>"
             )
-
         send_tg_message(message)
 
 
