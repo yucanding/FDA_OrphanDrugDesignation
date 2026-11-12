@@ -3237,3 +3237,6 @@
 999724
 999824
 99996
+CDKL5 Genetic Research Initiative 38006 Stenhammer Dr. Fremont, California 94536 United States|treatment of cyclin-dependent kinase-like 5 (CDKL5) deficiency disorder|11/06/2026|adeno-associated virus serotype 9 encoding human cyclin-dependent kinase-like 5 (rAAV9-hCDKL5)
+Cardiff Oncology 11055 Flintkote Avenue San Diego, California 92121 United States|treatment of small cell lung cancer|11/09/2026|onvansertib
+United Therapeutics Corporation|treatment of pulmonary arterial hypertension|11/09/2026|treprostinil and iloprost
