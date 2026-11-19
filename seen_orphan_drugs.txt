@@ -3241,4 +3241,5 @@ CDKL5 Genetic Research Initiative 38006 Stenhammer Dr. Fremont, California 94536
 Cardiff Oncology 11055 Flintkote Avenue San Diego, California 92121 United States|treatment of small cell lung cancer|11/09/2026|onvansertib
 KOUSAI (Shanghai) Bio Co., Ltd.|treatment of nasopharyngeal carcinoma|11/13/2026|autologous monocyte-derived DCs pulsed with EBV-associated antigen
 Multitude Therapeutics Co., Ltd. No. 159|treatment of anal cancer|11/12/2026|a humanized CD44v9-specific IgG1 antibody linked to the topoisomerase I inhibitor
+Shanghai Bao Pharmaceuticals Co., Ltd. No. 28|treatment of Guillain-Barre syndrome|11/19/2026|ricefidase
 United Therapeutics Corporation|treatment of pulmonary arterial hypertension|11/09/2026|treprostinil and iloprost
